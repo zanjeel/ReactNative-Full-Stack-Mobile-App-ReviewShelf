@@ -86,3 +86,7 @@ cd mobile
 npm install
 npx expo
 ```
+
+---
+
+**Author:** zanjeel tariq
