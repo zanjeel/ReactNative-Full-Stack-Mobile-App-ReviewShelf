@@ -1,8 +1,12 @@
-<h1 align="center"> ReviewShelf – Full‑Stack React Native App 🚀</h1>
+<h1 align="center">🚀 ReviewShelf – Full‑Stack React Native App 🚀</h1>
 
 ## 🎯 React Native Full Stack Mobile App
 
-ReviewShelf is a full-stack React Native mobile app for sharing book reviews. Users can sign up/login, create posts with book titles, ratings, cover images, and captions, view a home feed with infinite scrolling, see their profile with their posts, and delete posts. Built with React Native/Expo Router (frontend) and Node.js/Express/MongoDB (backend), with image uploads via Cloudinary.
+📱 ReviewShelf is a full-stack React Native mobile app for sharing book reviews. 
+
+👤 Users can sign up/login, create posts with book titles, ratings, cover images, and captions, view a home feed with infinite scrolling, see their profile with their posts, and delete posts. 
+
+🌐 Built with React Native/Expo Router (frontend) and Node.js/Express/MongoDB (backend), with image uploads via Cloudinary.
 ---
 
 ## 🧑‍🍳 App Features Overview
