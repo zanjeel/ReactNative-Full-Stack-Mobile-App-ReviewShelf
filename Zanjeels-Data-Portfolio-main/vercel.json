@@ -1,9 +1,0 @@
-{
-  "buildCommand": "bundle exec jekyll build",
-  "outputDirectory": "_site",
-  "installCommand": "bundle install",
-  "framework": "jekyll",
-  "env": {
-    "PAGES_REPO_NWO": "zanjeel/Zanjeels-Data-Portfolio"
-  }
-} 
