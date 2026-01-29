@@ -58,7 +58,7 @@
 
 ---
 
-## 📁 Run Code and .env Setup
+## 📁 Run Code & .env Setup 
 
 ### ⚙️ Backend (`/backend`)
 
