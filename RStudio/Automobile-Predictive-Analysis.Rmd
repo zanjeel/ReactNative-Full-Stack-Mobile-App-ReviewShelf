@@ -1,0 +1,1315 @@
+---
+title: "CS5801 Coursework Template Proforma"
+author: "2348513"
+date: "`r format(Sys.time(), '%d %B, %Y')`"
+output:
+  pdf_document: default
+  html_notebook: default
+version: 1
+bibliography: references.bib
+---
+
+# 0. Instructions 
+
+
+```{r}
+# Add code here to load all the required libraries with `library()`.  
+# Do not include any `install.package()` for any required packages in this rmd file.
+install.packages("Hmisc")
+install.packages("stringdist")
+install.packages("corrplot")
+install.packages("knitr")
+install.packages("kableExtra")
+install.packages("formattable")
+install.packages("DT")
+install.packages("tibble")
+install.packages("skimr")
+install.packages("caret")
+install.packages("robustbase")
+library(robustbase)
+library(skimr)
+library(forcats)
+library(knitr)
+library(tibble)
+library(kableExtra)
+library(formattable)
+library(DT)
+library(corrplot)
+library(Hmisc) #for median
+library(stringdist)
+library(ggplot2)
+library(dplyr)
+library(tidyr)
+library(caret)
+library(randomForest)
+library(tree)
+```
+
+
+
+# 1. Organise and clean the data
+
+## 1.1 Subset the data into the specific dataset allocated
+ 
+
+```{r}
+# Only change the value for SID 
+# Assign your student id into the variable SID, for example:
+SID <- 2348513                  # This is an example, replace 2101234 with your actual ID
+SIDoffset <- (SID %% 50) + 1    # Your SID mod 50 + 1
+View(cars.analysis)
+
+setwd("C:/Users/SLL807/Desktop/Assignment")
+
+load("car-analysis-data.Rda")
+# Now subset the car data set
+# Pick every 50th observation starting from your offset
+# Put into your data frame named mydf (you can rename it)
+mydf <- cars.analysis[seq(from=SIDoffset,to=nrow(cars.analysis),by=50),]
+```
+
+
+## 1.2 Data quality analysis plan
+
+1- Summary Statistics: Use functions like summary(), str(), head(), and tail() to get an overview data
+    
+2- Missing Values: identify missing values by is.na() func 
+
+3- Data Imputation: impute() to fill mising values
+
+4- Duplicates: finding duplicates by unique()
+
+5- Data Types: each column must have correct data type (class()) else convert them e.g as.numeric()
+
+6- Data Normalization: by == if duplicates found like my or My
+
+7- Outlier Detection: by boxplots and removal (if unlikely)
+
+8- Correlation Analysis: Evaluate correlations corr() between numeric variables for dependencies/multicollinearity.
+
+9- Data Distribution: Visualize data distributions with histograms, boxplots, or ggplot2
+
+10- Descriptive Statistics: Calculate descriptive statistics for numerical variables to understand their central tendencies and variability by summary() and other func
+
+11- Documentation and Reporting: Document all findings, transformations, and decisions clearly
+
+12- Data Consistency and Domain-Specific Checks: Assess consistency between related columns to ensure coherence and logical relationships.
+
+13- Cross-Field Validation: Validate relationships between different fields to ensure coherence.
+
+14- Documentation and Reporting: Document all findings, transformations, and decisions.
+
+## 1.3 Data quality analysis findings
+
+1. Summary Statistics
+
+```{r}
+# 1. Summary func to check the data set
+print("Checking Summary Statisctics to gret to know the dataset")
+cat("\n")
+
+summary_table <- summary(mydf)
+
+# Convert summary output to an HTML table with specified styling for all rows
+summary_table_html <- kable(summary_table, digits = 2, format = "html") %>%
+  kable_styling(full_width = FALSE) %>%
+  row_spec(0:nrow(summary_table), background = "#000000", color = "#FFFFFF")
+
+summary_table_html
+
+str(mydf)
+```
+
+2. Checked for missing entries by is.na()
+
+```{r}
+# 2. Check for missing values in all columns
+
+missing_values <- colSums(is.na(mydf))  
+missing_df <- data.frame(variable = names(missing_values), missing_count = missing_values)
+missing_df <- missing_df[order(-missing_df$missing_count), ]  # Sort by missing count
+
+# Visualize missing values
+ggplot(data = missing_df, aes(x = reorder(variable, -missing_count), y = missing_count)) +
+  geom_bar(stat = "identity", fill = "skyblue") +
+  coord_flip() +
+  labs(title = "Missing Values per Variable", x = "Variable", y = "Missing Count")
+
+missing_values <- colSums(is.na(mydf))
+#missing #issue 1 found: missing values
+if(any(missing_values)){
+  print("Rows contain NA. Imputating NA with Column Median")
+}
+```
+
+3. Impute NA with median of the column.
+
+```{r}
+# 3. Solving missing values by imputate
+for (col in names(mydf)) {
+  # Check if the column has missing values
+  if (any(is.na(mydf[[col]]))) {
+    # Calculate median of the column excluding NA values
+    col_median <- median(mydf[[col]], na.rm = TRUE)
+    
+    # Replace NA values with the median
+    mydf[[col]][is.na(mydf[[col]])] <- col_median
+  }
+}
+```
+
+4. Checked/removed duplicated rows by dupicated().
+
+```{r}
+# 4. Finding data duplicated ROWS
+duplicate_rows <- mydf[duplicated(mydf), ]
+
+if(nrow(duplicate_rows)>0){
+  print("Duplicate rows found")
+  print(duplicate_rows)
+  } else{
+  print("No Duplicate Rows Found")
+  }
+```
+
+5. Data Types checking and Removal by unique() and converted chars to factors as needed.
+
+```{r}
+# 5. Correcting Data Types by looking at str() and unique() result: 
+
+# brand, automatic_transmission, fuel, drivetrain, damaged, first_owner, navigation_system, bluetooth, third_row_seating, heated_seats are ALL CATEGORICAL
+mydf$brand <- as.factor(mydf$brand)
+mydf$automatic_transmission <- as.factor(mydf$automatic_transmission)
+mydf$fuel <- as.factor(mydf$fuel)
+mydf$drivetrain <- as.factor(mydf$drivetrain)
+mydf$damaged <- as.factor(mydf$damaged)
+mydf$first_owner <- as.factor(mydf$first_owner)
+mydf$navigation_system <- as.factor(mydf$navigation_system)
+mydf$bluetooth <- as.factor(mydf$bluetooth)
+mydf$third_row_seating <- as.factor(mydf$third_row_seating)
+mydf$heated_seats <- as.factor(mydf$heated_seats)
+
+
+##########################################
+```
+
+
+6. Checked/Corrected Data Consistency and Domain-Specific Checks for discrepancies and applied Data Normalization e.g negative values, spelling mistakes etc
+
+```{r}
+# 6. Performing Data Normalization/Data Consistency (e.g My==my)
+#Issues found: 
+#(ii). Pertol==Petrol in fuel
+
+mydf$fuel <- fct_collapse(mydf$fuel, Petrol = c("Pertol", "Petrol"))
+
+
+#(ii). Unknown values should be left as it is for transparency.
+
+#(iii). Here, numerical cols such as Price, max_mpg, min_mpg and mileage can never be negative
+mydf$year <- abs(mydf$year)
+mydf$mileage <- abs(mydf$mileage)
+mydf$engine_size <- abs(mydf$engine_size)
+mydf$min_mpg <- abs(mydf$min_mpg)
+mydf$max_mpg <- abs(mydf$max_mpg)
+mydf$price <- abs(mydf$price)
+
+#(iv). ignore if 
+           # (i) mileage>0 but max_mpg & min_mpg=0, assume car is not working
+           # (ii)mileage=0 but max_mpg and min_mpg>0, assume max and min mpg is taken as commonly seen mpgs.
+#(v). max_mpg>min_mpg else imputate from that car rows
+
+#(vi) DATA CONSISTENCY CHECKS
+
+#Check if 'year' values are within a reasonable range
+invalid_years <- mydf$year < 1900 | mydf$year > 2050
+
+# Check for negative mileage or unrealistically high values
+invalid_mileage <- mydf$mileage < 0 | mydf$mileage > 500000
+
+# Check for engine sizes that seem unrealistic
+invalid_engine_size <- mydf$engine_size <= 0 | mydf$engine_size > 100
+
+# Check for values outside expected range for min and max MPG
+invalid_min_max_mpg <- mydf$min_mpg < 0 | mydf$max_mpg < 0 | mydf$min_mpg > mydf$max_mpg
+
+# Check if 'price' values are negative or too high
+invalid_price <- mydf$price < 0 | mydf$price > 1e6
+
+# Check for inconsistencies between boolean columns (should be 0 or 1)
+invalid_boolean_columns <- mydf[, c("automatic_transmission", "damaged", "first_owner", 
+                                    "navigation_system", "bluetooth", "third_row_seating", 
+                                    "heated_seats")]
+invalid_boolean_columns <- invalid_boolean_columns !=0 & invalid_boolean_columns != 1
+
+inconsistency_matrix <- cbind(
+  as.integer(invalid_years),
+  as.integer(invalid_mileage),
+  as.integer(invalid_engine_size),
+  as.integer(invalid_min_max_mpg),
+  as.integer(invalid_price),
+  as.integer(rowSums(invalid_boolean_columns))
+)
+
+# Identify rows with any inconsistencies
+inconsistent_rows <- which(rowSums(inconsistency_matrix) > 0)
+
+# Display rows with inconsistencies
+if (length(inconsistent_rows) > 0) {
+  print("Inconsistent rows:")
+  print(mydf[inconsistent_rows, ])
+} else {
+  print("No inconsistencies found.")
+}
+
+print(unique(mydf$fuel))
+```
+
+7.Data visualisations for both categorical and numeric data
+
+```{r}
+#7.  Visualize outliers for numeric columns using boxplots
+
+numerical_columns <- c("year", "mileage", "engine_size", "min_mpg", "max_mpg", "price")
+
+#(i) BOXPLOT FOR NUMERICAL DATA
+for (col in numerical_columns) {
+  boxplot(mydf[[col]], main = col, ylab = col, col = "skyblue", border = "black", notch = TRUE)
+}
+
+#(ii) BAR PLOT FOR CATEGORICAL DATA
+categorical_columns <- c("brand", "automatic_transmission", "fuel", "drivetrain", "damaged", 
+                         "first_owner", "navigation_system", "bluetooth", "third_row_seating", 
+                         "heated_seats")
+
+for (col in categorical_columns) {
+ p<-  ggplot(mydf, aes_string(x = col)) +
+    geom_bar(fill = "skyblue") +
+    labs(title = paste("Bar plot of", col), x = col, y = "Count") +
+    theme_minimal() +
+    theme(axis.text.x = element_text(angle = 90, vjust = 0.5, hjust=1))
+ print(p)
+}
+
+```
+
+8. Detected Outliers of numerical by boxplots to understand descriptive statistics
+
+```{r}
+#8. OUTLIER DETECTION
+
+# Using boxplot.stats to identify outliers
+for (col in numerical_columns) {
+  box_data <- boxplot.stats(mydf[[col]])
+  outliers <- box_data$out
+  cat("Outliers in", col, ":", outliers, "\n")
+  if(length(outliers)==0){
+    print("No outliers")
+  }
+}
+```
+
+
+9. Correlation Analysis on all numerical columns using cor()
+
+```{r}
+#8. Cross-Field Analysis and Correlation
+# Selecting numerical columns for correlation analysis
+
+
+numeric_columns <- c("year", "mileage", "engine_size", "min_mpg", "max_mpg", "price")
+
+# Subsetting the dataframe with only numeric columns
+numeric_data <- mydf[, numeric_columns]
+
+# Calculating correlation matrix
+correlation_matrix <- cor(numeric_data)
+
+# Formatting the correlation matrix for better spacing and alignment
+formatted_matrix <- format(correlation_matrix, justify = "centre", digits = 2)
+
+# Printing the formatted matrix
+print(formatted_matrix)
+
+#############################################################################
+
+```
+ 
+## 1.4 Data cleaning
+                         
+1. Identified NAs and imputed with each column's median.
+2. Checked for duplicated rows but did not find any.
+3. Checked structure of data and found many data types which should be categorical  and converted them to factors.
+
+4. Found many data inconsistensies like:
+(i) Spelling mistakes e.g "Pertol" and "Peterol" which I normalised.
+(ii) Negative values which I took absolute of all numeric columns.
+
+5. Performed  Consistency Checks on both numeric and categorical variables: 
+       (a) numeric cols cannot be negative or unrealistic
+       (b) engine size must not be 0 and max_mpg>min_mpg
+       (c) some categorical variables must not be other than 0 or 1
+       
+6. Detected outliers in numeric data using boxplot and boxplot.stats() to identify outliers, most notable ones being: min_mpg: 89 and max_mpg: 100 which were significantly shown farthest from the median.
+
+7. Correlation Analysis showed highest correlation between max_mpg and min_mpg of ~0.9 
+8. Left "Unknown" values as is to not cause bias
+9.(i) Grouped data by "brand" with respect to means of  each numerical variable.
+   (ii) Grouped data by "brand" with respect to sum of each categorical variable.
+
+
+# 2. Exploratory Data Analysis (EDA)
+
+## 2.1 EDA plan
+
+1. Data Familiarization: 
+    - To understand the structure, columns, and size of the dataset (str(), head(), summary()).
+    - Descriptive Statistics: Calculate basic statistics (mean, median, min, max) for numeric variables.
+    
+2. Outlier Detection and Treatment:
+    - Boxplots: Identify and handle outliers in numeric variables (remove, transform, or impute).
+    
+3. Univariate Analysis:
+    - Bar Charts: Display frequency counts for categorical variables.
+    - Boxplots: Identify outliers and understand variability in numeric variables.
+    
+4. Bivariate and Multivariate Analysis:
+    - Correlation Analysis: Evaluate relationships between numeric variables using correlation matrices and         scatterplots.
+    - Scatterplots: Explore relationships between pairs of numeric variables.
+    - Categorical Analysis: Compare categories across groups using heatmaps and bar plots.
+    
+5. Distribution of 'price': 
+    - Relationship between 'price' and other numerical variables using cor().
+    - ANOVA to explore how 'price' varies across categories of categorical predictors.
+    - Visualisation with other variables
+
+
+6. Distribution of 'First Owner':
+    - Fishers test/Chi-sq to explore relationships with other categorical variables.
+    - Logistic Regression to predict 'first_owner' based on other predictors.
+    - Visualisation with other variables
+    
+    
+7. Pattern Identification and Visualization:
+    - Trends and Patterns: Identify trends, seasonality, or sequential data.
+
+8. Summary and Documentation:
+    - Summary Report: Summarize key findings, insights, and initial hypotheses.
+    
+
+
+## 2.2 EDA execution   
+
+1. Data Familiarization/descriptive summary 
+
+```{r}
+#1. Data Familiarization
+# Structure of the dataset
+
+str(mydf)
+
+# Loop through each column and output summary
+for (col in names(mydf)) {
+  cat("Summary for column:", col, "\n")
+  print(summary(mydf[[col]]))
+  cat("\n")
+}
+
+#############################
+```
+
+2. Outlier Detection and Treatment
+
+```{r}
+#2 Outliers Detection and Correction
+  # Visualize outliers for numeric columns using boxplots
+numerical_columns <- c("year", "mileage", "engine_size", "min_mpg", "max_mpg", "price")
+
+
+# Function to calculate the distance of outliers from the median
+calculate_distance_from_median <- function(column) {
+  median_val <- median(column)
+  distances <- abs(column - median_val)
+  return(distances)
+}
+
+# Using boxplot.stats to identify outliers and rank them based on distance from median
+for (col in numerical_columns) {
+  box_data <- boxplot.stats(mydf[[col]])
+  outliers <- box_data$out
+  
+  distances_from_median <- calculate_distance_from_median(outliers)
+  
+  # Rank outliers by their distance from the median in descending order
+  outliers_ranked <- outliers[order(distances_from_median, decreasing = TRUE)]
+  
+  cat("Outliers in", col, ":", outliers_ranked, "\n")
+  if(length(outliers_ranked) == 0) {
+    print("No outliers")
+  }
+}
+
+result <- mydf[mydf$min_mpg == 89, ]
+print(result)
+
+result <- mydf[mydf$max_mpg == 100, ]
+print(result)
+
+#result is 1 row, imputing it with median
+
+median_min_mpg <- median(mydf$min_mpg, na.rm = TRUE)
+median_max_mpg <- median(mydf$max_mpg, na.rm = TRUE)
+mydf$min_mpg[mydf$min_mpg == 89] <- median_min_mpg
+mydf$max_mpg[mydf$max_mpg == 100] <- median_max_mpg
+
+###########################################################################################
+```
+
+3.  Univariate Analysis: 
+          (i) Bar Chartsfor categorical variables.
+          (ii) Boxplots for numeric variables.
+          
+```{r}
+#3. Univariate Analysis
+
+##################### NUMERIC ################
+
+
+numerical_cols <- c("year", "mileage", "engine_size", "min_mpg", "max_mpg", "price")
+categorical_cols <- c("brand", "automatic_transmission", "fuel", "drivetrain", "damaged", 
+                         "first_owner", "navigation_system", "bluetooth", "third_row_seating", 
+                         "heated_seats")
+
+
+# Histograms for numerical variables (separately)
+for (col in numerical_cols) {
+  boxplot(mydf[[col]], main = col, ylab = col, col = "skyblue", border = "black", notch = TRUE)
+}
+################## CATEGORICAL ####################
+
+# Bar plots for categorical variables (separately)
+for (col in categorical_cols) {
+ p <-  ggplot(mydf, aes_string(x = col)) +
+    geom_bar(fill = "skyblue") +
+    labs(title = paste("Bar plot of", col), x = col, y = "Count") +
+    theme_minimal() +
+    theme(axis.text.x = element_text(angle = 90, vjust = 0.5, hjust=1))
+ print(p)
+}
+
+```
+
+4. Correlation Analysis:corplot for numerical and heatmaps for categorical analysis.
+
+```{r}
+#3. Correlation of Variables
+
+
+########### (a) NUMERICAL CORRELATION (and representaion as corrplot) ########################
+
+# Compute correlations between numerical columns
+correlations <- cor(mydf[, sapply(mydf, is.numeric)], method = "pearson")
+# Displaying the correlation matrix with corrplot
+corrplot(correlations, method = "circle", type = "upper", order = "hclust")
+
+# Exclude diagonal elements (correlation of variables with themselves)
+diag(correlations) <- NA
+
+# Get upper triangle of the correlation matrix (excluding diagonal)
+upper_tri <- as.data.frame(as.table(correlations))
+upper_tri <- upper_tri[upper_tri$Var1 != upper_tri$Var2, ]
+
+# Create a unique identifier for each pair of variables
+upper_tri$CombinedVars <- apply(upper_tri[, c("Var1", "Var2")], 1, function(x) paste(sort(x), collapse="-"))
+
+# Remove Var1 and Var2 columns
+sorted_correlations <- upper_tri[, c("CombinedVars", "Freq")]
+
+# Aggregate by CombinedVars to get the maximum absolute correlation value
+sorted_correlations <- aggregate(Freq ~ CombinedVars, data = sorted_correlations, FUN = max)
+
+# Sort correlations in descending order
+sorted_correlations <- sorted_correlations[order(-abs(sorted_correlations$Freq)), ]
+
+print(sorted_correlations)
+
+
+
+########### (b) CATEGORICAL CORRELATION (and representaion as heatmap) ########################
+
+
+# Create a function to calculate Cramer's V
+cramers_v <- function(x, y) {
+  return(assocstats(table(x, y))$cramer)
+}
+
+# Create an empty matrix to store the correlation values
+correlation_matrix <- matrix(NA, nrow = length(categorical_cols), ncol = length(categorical_cols))
+colnames(correlation_matrix) <- rownames(correlation_matrix) <- categorical_cols
+
+# Calculate Cramer's V for each pair of categorical variables
+for (i in 1:(length(categorical_cols) - 1)) {
+  for (j in (i + 1):length(categorical_cols)) {
+    correlation_matrix[i, j] <- cramers_v(mydf[[categorical_cols[i]]], mydf[[categorical_cols[j]]])
+    correlation_matrix[j, i] <- correlation_matrix[i, j]
+  }
+}
+
+# Flatten the upper triangle of the correlation matrix to extract pairs and their correlations
+upper_triangle <- as.data.frame(as.table(correlation_matrix))
+upper_triangle <- upper_triangle[order(-upper_triangle$Freq), ]
+
+
+# Convert factors to characters (if necessary)
+upper_triangle$Var1 <- as.character(upper_triangle$Var1)
+upper_triangle$Var2 <- as.character(upper_triangle$Var2)
+
+# Extract unique combinations of Var1, Var2, and Correlation
+unique_triangle <- unique(transform(upper_triangle, 
+                                    Var1 = pmin(Var1, Var2),
+                                    Var2 = pmax(Var1, Var2))
+                          )[, c("Var1", "Var2", "Freq")]
+
+unique_triangle
+
+# Convert the matrix to a data frame for plotting
+correlation_df <- expand.grid(Var1 = categorical_cols, Var2 = categorical_cols)
+correlation_df$Correlation <- as.vector(correlation_matrix)
+
+
+# Plot heatmap
+  ggplot(correlation_df, aes(Var1, Var2, fill = Correlation)) +
+  geom_tile() +
+  scale_fill_gradient(low = "white", high = "blue") +
+  labs(title = "Categorical Variables Heatmap", x = "", y = "") +
+  theme_minimal() +
+  theme(axis.text.x = element_text(angle = 45, vjust = 1, hjust = 1))
+```
+
+5. Visualisation of Bivariate and Multivariate Analysis (usig corplot and heatmap)
+
+
+```{r}
+######################################################################
+#4.Bivariate and Multivariate Analysis
+  
+  #Plotting STRONGEST correlation graphs for numerical-numerical vars: (GENERAL)
+  
+  #1. min_mpg-max_mpg (0.93)
+  
+  ggplot(mydf, aes(x = min_mpg, y = max_mpg)) +
+  geom_point() +
+  labs(x = "min_mpg", y = "max_mpg") +
+  ggtitle("Scatter plot of min_mpg vs max_mpg")
+  
+  #2. price-mileage (-0.6)
+  
+  ggplot(mydf, aes(x = mileage, y = price)) +
+  geom_point() +
+  labs(x = "Mileage", y = "Price") +
+  ggtitle("Scatter plot of Price vs Mileage")
+  
+  
+  
+###########################################################################
+    
+  #Plotting STRONGEST correlation graphs for categorical-categorical vars: (GENERAL)
+  
+  #1. brand-navigation_system(0.53)
+  ggplot(mydf, aes(x = brand, fill = navigation_system)) +
+  geom_bar(position = "dodge", color = "black") +
+  labs(title = "Brand vs Navigation System", x = "Brand", y = "Count") +
+  theme_minimal() +
+  theme(axis.text.x = element_text(angle = 90, vjust = 0.5, hjust=1))
+
+  
+  #2. brand_first_owner(0.40)
+  ggplot(mydf, aes(x = brand, fill = first_owner)) +
+  geom_bar(position = "dodge", color = "black") +
+  labs(title = "Brand vs First Owner", x = "Brand", y = "Count") +
+  theme_minimal() +
+  theme(axis.text.x = element_text(angle = 90, vjust = 0.5, hjust=1))
+
+```
+
+6. Distribution of 'price': 
+    - Relationship between 'price' and other numerical variables using cor().
+    - ANOVA to explore how 'price' varies across categories of categorical predictors.
+    - Visualisation with other variables
+
+```{r}
+#5. # EDA with respect to PRICE 
+
+numerical_cols <- c("year", "mileage", "engine_size", "min_mpg", "max_mpg", "price")
+
+categorical_cols <- c("brand", "automatic_transmission", "fuel", "drivetrain", "damaged", 
+                         "first_owner", "navigation_system", "bluetooth", "third_row_seating", 
+                         "heated_seats")
+
+                         
+numerical_vars <- mydf[, sapply(mydf, is.numeric)]
+numerical_vars <- numerical_vars[, !names(numerical_vars) %in% "price"]
+
+# (a) Calculate correlations with 'price' for each numerical variable
+correlations <- sapply(numerical_vars, function(x) cor(mydf$price, x))
+correlations
+
+# (highest correlations between price and mileage: -0.607 and price and year: 0.438)
+
+
+# (b) ANOVA to explore how 'price' varies across categories of categorical predictors.############
+
+for(col in categorical_cols){
+  anova_result <- aov(mydf$price ~ mydf[[col]])
+  cat("ANOVA between 'price' and '", col, "':\n")
+  print(summary(anova_result))
+}
+# (Fuel p-value (0.0671) indicates a borderline significance/least significance between them and price)
+
+
+# (c) Visualisation of Price and other variables
+
+# Plotting Price against all categorical variables
+for (col in names(mydf)[sapply(mydf, is.factor)]) {
+  p <- ggplot(mydf, aes_string(x = col, y = "price")) +
+    geom_boxplot() +
+    labs(title = paste("Price vs.", col), x = col, y = "Price") +
+    theme(axis.text.x = element_text(angle = 45, hjust = 1)) +
+    coord_flip()
+  
+  print(p)
+}
+
+# Plotting Price against all numerical variables
+for (col in names(mydf)[sapply(mydf, is.numeric)]) {
+  if (col != "price") {
+  p <- ggplot(mydf, aes_string(x = col, y = "price")) +
+    geom_point() +
+    labs(title = paste("Price vs.", col), x = col, y = "Price")
+  
+  print(p)
+  }
+}
+```
+
+
+
+7. Distribution of 'First Owner':
+    - Fishers test/Chi-sq to explore relationships with other categorical variables.
+    - Visualisation with other variables
+
+
+```{r}
+#6. EDA with respect to first_owner
+
+# (a) Chi-sq test/Fishers to explore relationships with other categorical variables 
+
+numerical_cols <- c("year", "mileage", "engine_size", "min_mpg", "max_mpg", "price")
+
+categorical_cols <- c("brand", "automatic_transmission", "fuel", "drivetrain", "damaged", 
+                      "navigation_system", "bluetooth", "third_row_seating", "heated_seats")
+
+for (col in categorical_cols) {
+  contingency_table <- table(mydf$first_owner, mydf[[col]])
+  
+  # Check counts in the contingency table
+  counts_below_5 <- sum(contingency_table < 5)
+  counts_above_5 <- sum(contingency_table >= 5)
+  
+  if (counts_below_5 > counts_above_5) {
+    cat("Column", col, "has most counts below 5. Performing Fisher's Exact Test.\n")
+    fisher_test <- tryCatch(fisher.test(contingency_table, simulate.p.value = TRUE), error = function(e) e)
+    
+    if (!inherits(fisher_test, "error")) {
+      print(fisher_test)
+    } else {
+      cat("Fisher's exact test couldn't be performed.\n")
+    }
+  } else {
+    cat("Column", col, "has most counts above or equal to 5. Performing Chi-square Test.\n")
+    chisq_test <- tryCatch(chisq.test(contingency_table), error = function(e) e)
+    
+    if (!inherits(chisq_test, "error")) {
+      print(chisq_test)
+    } else {
+      cat("Chi-square test couldn't be performed.\n")
+    }
+  }
+}
+# Weak Significant relationship between first_owner and these variables:
+# fuel: 0.096
+# damaged :0.05607
+# navigation_sys: 0.51
+# bluetooth: 0.28
+
+# (b) Visualisation of first_owner and other variables
+
+# Plotting First Owner against all categorical variables
+for (col in names(mydf)[sapply(mydf, is.factor)]) {
+  if (col != "first_owner") {
+    p <- ggplot(mydf, aes_string(x = col, fill = "first_owner")) +
+      geom_bar(position = "dodge") +
+      labs(title = paste("First Owner vs.", col), x = col, y = "Count") +
+      scale_fill_discrete(name = "First Owner") +
+      theme(axis.text.x = element_text(angle = 45, hjust = 1)) +
+      coord_flip()
+    
+    print(p)
+  }
+}
+
+# Plotting First Owner against all numerical variables
+for (col in names(mydf)[sapply(mydf, is.numeric)]) {
+  p <- ggplot(mydf, aes_string(x = col, fill = "first_owner")) +
+    geom_boxplot() +
+    labs(title = paste("First Owner vs.", col), x = "First Owner", y = col)
+  
+  print(p)
+}
+
+
+```
+
+
+## 2.3 EDA summary of results
+
+
+1. There were outliers in year, mileage, engine_size, min_mpg and max_mpg. No outliers in price and it had a normal distribution.
+
+2. The farthest outlier from the mean in max_mpg and min_mpg were from the same row, so I imputed them with their respective columns median.
+
+2.  (i)  There was more quantity of cars which were not damaged, did not have navigation systems, third row            seats or heated seats.
+    (ii) Most had automatic transmission and bluetooth, ran on petrol were more four-wheel and front-wheel             drives and had one-owner.
+
+3. Strong negative correlation (using cor() function) between:
+    (i) price and mileage (-0.6)  and 
+    (ii) min mpg and max mpg (0.9)
+    
+4. Weak significance between price and fuel(0.067) using ANOVA function.
+
+4. Strong relationship of:
+    (i) navigation system and brand (0.53) - highest on the heatmap and
+    (ii) brand and first owner (0.4)- 2nd highest.
+
+5. Weak significant relationship between:
+   (i) first owner and bluetooth (0.28),
+   (ii) first owner and navigation system (0.51) and
+   (iii) first owner and fuel (0.09) 
+    using Chi sq/Fishers Test depending on individual tables data (if most were greater than 5, Chi-sq was        used else Fishers Test) 
+
+6. First owners had more cars with automatic transmission, petrol four wheel drives, damaged, bluetooth, less with navigation system or third row seating.
+
+7. First owners possessed more expensive cars, with more recent years, lesser mileage.
+
+## 2.4 Additional insights and issues
+
+1. There is the strongest correlation between 2 numerical variables:
+      - min mpg and max mpg which is 0.9 (almost 1), showing extreme correlation which must have to be                removed by feature engineering (taking average of both numerical variables).
+
+2. There is the strongest correlation between 2 categorical variables: 
+      - navigation_system and brand is 0.53, showing extreme correlation on the heatmap, which has to be              removed using dimensionality reduction techniques e.g by
+            (i) PCA (Principal Component Analysis) or
+            (ii) Regularization Techniques like Ridge Regression or Lasso Regression.
+      - Both of them can reduce multi-collinearity.
+
+3. Outlier Treatment:
+      - Advanced techniques like winsorization, truncation, or robust statistical measures (like median               absolute deviation) to mitigate the impact of outliers on the model.
+    
+4. Feature Transformation:
+      - For mileage, transformations like log or square root can handle its strong negative correlation               with price.
+    
+5. Data Balancing:
+     - In scenarios where certain categories of categorical variables (e.g., damaged vs. non-damaged) are            imbalanced, advanced techniques like oversampling, undersampling, or synthetic data generation methods        can be used to balance the classes.
+
+
+# 3. Modelling
+
+## 3.1 Explain your analysis plan
+
+1. Addressing Multi-collinearity Issues (found in EDA) : min_mpg and max_mpg are merged into one to reduce       multi-collinearity interfering with the model.
+
+2. Baseline Linear Regression:
+    - Fit the initial linear regression model using lm() with all relevant predictors (lm(price ~ ., data =         your_data_frame)).This establishes a foundational model to begin predicting used car prices.
+
+3. Stepwise Selection with step() Function:
+    - Implement the step() function to iteratively select predictors.
+    - Iteratively adds or eliminates predictors to refine the model's predictive power.
+    - Plotting Stepwise Selection
+    
+4. Visualizing Model Improvement:
+    - Create a plot showcasing the stepwise selection process.
+    - Residuals vs. Fitted Values to check hetroscedacity i.e if unequal variance in predictor variables.
+    - Normal Q-Q Plot: Will Assess residual normality
+    - Scale-Location Plot: Will Detect variance patterns
+    - Residuals vs. Leverage: Will Identify influential points
+    
+5. Reducing if Hetroscedacity found by taking log of prices. 
+
+6. Category Level Reduction:
+    - Merging extensive levels of categorical variables into smaller number of categories if they have              substantial effect on target variable (price).
+    
+7. Model Evaluation:
+    - Calculate essential metrics (e.g., R-squared, adjusted R-squared, RMSE, MAE).
+    - Random Forest or Regression Tree to see which predictor variables have most effect on car prices.
+    - Model Plots evaluation
+    
+
+
+## 3.2 Build a model for car price
+
+1. Implementing Feature-Extraction on min_mpg and max_mpg by taking their mean
+
+```{r}
+# Create a new feature using the average of min_mpg and max_mpg
+mydf$avg_mpg <- (mydf$min_mpg + mydf$max_mpg) / 2
+
+# Remove min_mpg and max_mpg from the dataset
+mydf <- subset(mydf, select = -c(min_mpg, max_mpg))
+
+mydf$avg_mpg
+```
+2. Building Maximal Linear Regression Model
+
+```{r}
+#Building Initial Model
+model_lm <- lm(price ~ year+ mileage +engine_size + avg_mpg + brand +automatic_transmission +fuel + drivetrain+ damaged + first_owner + navigation_system + bluetooth + third_row_seating + heated_seats, data = mydf)
+
+# Summary of the model
+summary(model_lm)
+
+step(model_lm)
+
+plot(model_lm)
+```
+3. Summarising Model:
+
+```{r}
+model1 <-lm(price ~ year + mileage + engine_size + avg_mpg + 
+    brand + fuel + drivetrain + damaged + first_owner + navigation_system + 
+    third_row_seating, data = mydf)
+summary(model1)
+```
+
+4. Cross validation of Model 1:
+
+```{r}
+set.seed(123)
+cv_results <- train(
+  price ~ year + mileage + engine_size + avg_mpg + brand + fuel + drivetrain + damaged + first_owner + navigation_system + third_row_seating, 
+  data = mydf, 
+  method = "lm", 
+  trControl = trainControl(method = "cv", number = 10)
+)
+print(cv_results)
+
+# Random Forest
+
+model_rf <- randomForest(price ~ year + mileage + engine_size + avg_mpg + brand + fuel + drivetrain + damaged + first_owner + navigation_system + third_row_seating, data = mydf)
+print(model_rf)
+
+# Feature importance plot for Random Forest
+varImpPlot(model_rf)
+
+#brand, year and mileage have significantly higher IncNodePurity values so re the most important predictors in predicting car prices.
+```
+
+5. Model 1 is too big, we have to reduce levels of categories with >2 levels i.e brand, drivetrain and fuel.
+
+
+```{r} 
+# Reduce the brand categories based on prices
+mydf <- mydf %>%
+  mutate(brand_group = case_when(
+    price <= 25000 ~ "Low_Price",
+    price > 25000 & price <= 40000 ~ "Mid_Price",
+    price > 40000 ~ "High_Price",
+    TRUE ~ "Other"
+  ))
+
+mydf$brand_group <- as.factor(mydf$brand_group)
+
+
+# Reducing Drivetrain
+mydf %>% 
+  count(drivetrain)
+
+
+# Group levels in the drivetrain variable
+mydf <- mydf %>%
+  mutate(drivetrain_group = fct_collapse(drivetrain,
+                                         "Four-wheel Drive" = c("Four-wheel Drive"),
+                                         "Front-wheel Drive" = c("Front-wheel Drive"),
+                                         "Other" = c("Rear-wheel Drive", "Unknown", "2WD")))
+
+# REDUCING FUEL CATEGORIES
+mydf %>% count(fuel)
+
+# Group levels in the fuel variable
+mydf <- mydf %>%
+  mutate(fuel_group = fct_collapse(fuel,
+                                    "Petrol" = c("Petrol"),
+                                    "Other" = c("Hybrid", "Electric", "GPL", "Unknown", "Diesel")))
+
+model_lm <- lm(price ~ year + mileage + engine_size + avg_mpg + brand_group + automatic_transmission + fuel_group + drivetrain_group + damaged + first_owner + navigation_system + bluetooth + third_row_seating + heated_seats, data = mydf)
+
+# Summary of the model
+summary(model_lm)
+
+step(model_lm)
+
+plot(model_lm)
+
+```
+
+
+6. Summarising Model 2:
+
+```{r}
+model2 <-lm(formula = price ~ year + mileage + engine_size + brand_group + 
+    automatic_transmission + drivetrain_group + first_owner + 
+    navigation_system, data = mydf)
+summary(model2)
+```
+7. Cross Validation of Model 2:
+
+```{r}
+# Cross-validation with caret package (example with 10-fold cross-validation)
+
+set.seed(123)
+cv_results <- train(
+  price ~ year + mileage + engine_size + brand_group + automatic_transmission + drivetrain_group + first_owner + navigation_system, 
+  data = mydf, 
+  method = "lm", 
+  trControl = trainControl(method = "cv", number = 10)
+)
+print(cv_results)
+
+# Random Forest
+
+model_rf <- randomForest(price ~ year + mileage + engine_size + brand_group + automatic_transmission + drivetrain_group + first_owner + navigation_system, data = mydf)
+print(model_rf)
+
+# Feature importance plot for Random Forest
+varImpPlot(model_rf)
+
+#brand_group, year and mileage have significantly higher IncNodePurity values so re the most important predictors in predicting car prices.
+```
+Model 2 is better than Model 1 so far.
+
+
+## 3.3 Critique model using relevant diagnostics
+
+1. Model 1 was a maximal model with no heteroscedasticity, but had a large equation, many predictors, and        moderate fit statistics (RSE = 5326, R-squared = 0.82, F-statistic = 40.8).
+
+2. Model 2 reduced the levels of categorical predictors with more than two levels, resulting in fewer            predictors and better fit statistics (RSE = 3886, R-squared = 0.89, F-statistic = 343.5).
+      
+3. Model 2 outperforms Model 1 in terms of RMSE, R-squared, and MAE.
+   Model 2 (with 8 predictors) shows lower RMSE (3961.563 vs. 6152.944), higher R-squared (0.893 vs. 0.751),     and lower MAE (3277.534 vs. 4533.42) compared to Model 1 (with 11 predictors).
+
+4. Model 1 shows: Newer cars have higher prices. Higher mileage reduces the price. Larger "engine_size" increases price. Being a first owner increases prices.
+
+5. Potential Weakness involves
+      (i) Hetroscedacity presence and incomplete removal by the model.
+      (ii) Loss of information, over-generalisation and/or biased results due to reduction of categorical            variables’ levels.
+      (iii) Model Predictions: Unequal variance across predictors affect the accuracy of prediction.
+      (iv) Misleading Residual Analysis: Residual plots might mislead interpretations.
+      (v) Biased Estimates: Heteroscedasticity violates the assumption of homoscedasticity,leading to biased            estimates of coefficients and their standard errors
+
+## 3.4 Suggest and implement improvements to your model
+
+      - Alternative Approach: 
+Apply log transformation to price to reduce heteroscedasticity, resulting in the lowest RSE.      
+
+1. Keep the categorical variables with more than two levels without reduction. Apply log transformation to the price to reduce heteroscedasticity, similar to Model 3.
+
+2. Model Evaluation: Use cross-validation to evaluate the model’s predictive power. Compare the RSE, R-squared, and F-statistic values with those of Model 3.
+
+3. Feature Importance Analysis: Conduct a feature importance analysis to understand which predictors are most important in the new model.
+
+```{r}
+# Reducing Hetroscedacity
+
+# Apply transformations to response or predictor variables
+mydf$log_Price <- log(mydf$price)  # Log transformation on response variable
+
+# Re-fit the model with transformed variables
+model_log <- lm(log_Price ~ year + mileage + engine_size + avg_mpg + brand_group + automatic_transmission + fuel_group + drivetrain_group + damaged + first_owner + navigation_system + bluetooth + third_row_seating + heated_seats, data = mydf)
+
+summary(model_log)
+step(model_log)
+plot(model_log)
+```
+
+
+Performing cross-validation(e.g.RMSE, MAE etc) and  Random Forest 
+
+```{r}
+# Cross-validation with caret package (example with 10-fold cross-validation)
+
+set.seed(123)
+cv_results <- train(
+  log_Price ~ year + mileage + engine_size + avg_mpg + brand_group + automatic_transmission + fuel_group +   drivetrain_group + damaged + first_owner + navigation_system + bluetooth + third_row_seating + heated_seats, 
+  data = mydf, 
+  method = "lm", 
+  trControl = trainControl(method = "cv", number = 10)
+)
+print(cv_results)
+# RMSE (Root Mean Squared Error): The average error (in price) is  0.20
+# R-squared: The proportion of variance in the car prices that can be explained by the model is 0.833
+# MAE (Mean Absolute Error): Difference between predicted and actual prices is 0.1522
+
+# Random Forest
+
+model_rf <- randomForest(log_Price ~ year + mileage + engine_size + avg_mpg + brand_group + automatic_transmission + fuel_group + drivetrain_group + damaged + first_owner + navigation_system + bluetooth + third_row_seating + heated_seats, data = mydf)
+print(model_rf)
+
+# Feature importance plot for Random Forest
+varImpPlot(model_rf)
+
+#brand_group, year and mileage have significantly higher IncNodePurity values so re the most important predictors in predicting car prices.
+
+```
+Summary of Model 3:
+```{r}
+mod <- lm(formula = log_Price ~ year + mileage + engine_size + brand_group + 
+    drivetrain_group + first_owner + bluetooth + third_row_seating, 
+    data = mydf)
+
+summary(mod)
+```
+Model Equation is:
+$$ 
+\text{log_Price} = -7.275 + 0.00882 \times \text{year} - 4.125 \times 10^{-6} \times \text{mileage} + 0.05796 \times \text{engine_size} - 0.6348 \times \text{brand_groupLow_Price} 
+- 0.2261 \times \text{brand_groupMid_Price} - 0.03085 \times \text{drivetrain_groupFour-wheel Drive} - 0.2073 \times \text{drivetrain_groupFront-wheel Drive} + 0.041 \times \text{first_owner1} + 0.09754 \times \text{bluetooth1} + 0.06896 \times \text{third_row_seating1}
+$$
+Regression Tree for modelling interactions:
+```{r}
+mod.tree<-tree(log_Price ~ year+ mileage +engine_size +avg_mpg + brand_group +automatic_transmission +fuel_group + drivetrain_group+ damaged + first_owner + navigation_system + bluetooth + third_row_seating + heated_seats, data = mydf)
+plot(mod.tree)
+text(mod.tree)
+```
+
+- Model 3 applied log transformation to price to reduce heteroscedasticity, resulting in the lowest RSE         (0.195) and highest F-statistic (217.8), but lower R-squared values than model 2. Model 3 was chosen as the   best model.
+
+- Cross-validation confirmed the high predictive power of model 3 (R-squared = 0.833).
+
+Hence, from model2 and model3, model 3 is better as there is less hetroscedescity.
+
+# 4. Modelling another dependent variable
+
+## 4.1 Model the likelihood of a car being sold by the first owner (using the first_owner variable provided).
+
+
+1. Exploration & Initial Model:
+    Explore first_owner using glm with categorical variables.
+    Fit an initial glm model with all relevant predictors for predicting used car prices.
+    
+2. Stepwise Selection:
+    Utilize step() to iteratively select predictors.
+    
+3. Visualizing Improvement:
+    Create plots for stepwise selection process.
+    
+4. Check for heteroscedasticity example by Residuals vs. Fitted Values etc
+    
+5. Heteroscedasticity Reduction:
+    If identified, consider grouped/ungrouped levels in categorical variables.
+
+6. Model Evaluation:
+    Cross-validate essential metrics: Accuracy, Kappa, Random Forest.
+    Use Random Forest or Regression Tree to identify influential predictors.
+    Evaluate model plots for assessment.
+    
+
+```{r}
+# Distribution of the target variable
+summary(mydf)
+str(mydf)
+table(mydf$first_owner)
+
+numerical_cols <- c("year", "mileage", "engine_size", "avg_mpg", "price")
+categorical_cols <- c("brand_group", "automatic_transmission", "fuel_group", "drivetrain_group", "damaged", 
+                      "navigation_system", "bluetooth", "third_row_seating", "heated_seats")
+
+for(col in numerical_cols){
+  anova_result <- aov(mydf[[col]] ~ first_owner, data = mydf)
+  cat("ANOVA between 'first_owner' and '", col, "':\n")
+  print(summary(anova_result))
+}
+
+#first_owner and avg_mpg insignificant corelation
+#first_owner and engine_size insignificant corelation
+
+
+
+```
+2. Building a maximal model for first_owner using step() using original columns (without reducing categorical levels)
+
+```{r}
+# Fit logistic regression model
+model_first_owner <- glm(first_owner ~ year + mileage + engine_size + avg_mpg + brand + automatic_transmission + fuel + drivetrain + damaged + price + navigation_system + bluetooth + third_row_seating + heated_seats, data = mydf, family = binomial)
+
+# Summary of the model
+summary(model_first_owner)
+
+step(model_first_owner)
+
+plot(model_first_owner)
+
+```
+3. Summarising the significant model by the step() function
+
+```{r}
+#Suggested Model is:
+ first_owner_model <- glm(first_owner ~ year + mileage + automatic_transmission + 
+    drivetrain + bluetooth + third_row_seating, family = binomial, 
+    data = mydf)
+summary(first_owner_model)
+```
+
+$$
+\log\left(\frac{P(\text{first_owner} = 1)}{1 - P(\text{first_owner} = 1)}\right) = -410.7 + 0.2165 \times \text{year} - 0.00002678 \times \text{mileage} + 1.246 \times \text{automatic_transmission1} \\
+-24.79 \times \text{drivetrain_Four-wheel Drive} - 24.45 \times \text{drivetrain_Front-wheel Drive} - 24.87 \times \text{drivetrain_Rear-wheel Drive} \\
+-19.15 \times \text{drivetrain_Unknown} - 1.493 \times \text{bluetooth1} + 1.306 \times \text{third_row_seating1}
+$$
+
+4. Cross Validation:
+
+```{r}
+# Cross-validation with caret package (example with 10-fold cross-validation)
+set.seed(123)
+
+cv_results <- train(
+  first_owner ~ year + mileage + automatic_transmission + drivetrain + bluetooth + third_row_seating,
+  data = mydf, 
+  method = "glm", 
+  family = "binomial",  
+  trControl = trainControl(method = "cv", number = 10)
+)
+
+print(cv_results)
+# RMSE (Root Mean Squared Error): The average error (in price) is  1852
+# R-squared: The proportion of variance in the car prices that can be explained by the model is 0.977
+# MAE (Mean Absolute Error): Difference between predicted and actual prices is 1453
+
+
+# Random Forest
+
+model_rf <- randomForest(first_owner ~ year + mileage + automatic_transmission + drivetrain + bluetooth + third_row_seating, data = mydf)
+print(model_rf)
+
+# Feature importance plot for Random Forest
+varImpPlot(model_rf)
+```
+
+```{r}
+# Predict probabilities of being a first owner
+predictions <- predict( first_owner_model, type = "response")
+
+# Visualize actual vs predicted probabilities
+ggplot(mydf, aes(x = predictions, fill = as.factor(first_owner))) +
+  geom_histogram(position = "identity", alpha = 0.5, bins = 30) +
+  labs(x = "Predicted Probability of Being First Owner", y = "Frequency") +
+  scale_fill_discrete(name = "First Owner", labels = c("Not First Owner", "First Owner")) +
+  theme_minimal()
+
+
+```
+
+5. ALTERNATIVE APPROACH- Reducing Weaknesses of the model and exploring methods to improve it:
+
+There are too many predictor variables. Trying to model grouped categories with first_owner, building model 2
+
+```{r}
+model2_first_owner <- glm(first_owner ~ year + mileage + engine_size + avg_mpg + brand_group + automatic_transmission + fuel_group + drivetrain_group + damaged + price + navigation_system + bluetooth + third_row_seating + heated_seats, data = mydf, family = binomial)
+
+# Summary of the model
+summary(model2_first_owner)
+
+step(model2_first_owner)
+
+plot(model2_first_owner)
+```
+
+
+```{r}
+first_owner_model <- glm(first_owner ~ year + mileage + brand_group + automatic_transmission + 
+    drivetrain_group + price + bluetooth + third_row_seating, 
+    family = binomial, data = mydf)
+summary(first_owner_model)
+```
+Cross Validation:
+
+```{r}
+# Cross-validation with caret package (example with 10-fold cross-validation)
+set.seed(123)
+
+cv_results <- train(
+  first_owner ~ year + mileage + brand_group + automatic_transmission + 
+    drivetrain_group + price + bluetooth + third_row_seating,
+  data = mydf, 
+  method = "glm", 
+  family = "binomial",  
+  trControl = trainControl(method = "cv", number = 10)
+)
+
+print(cv_results)
+
+
+# Random Forest
+
+model_rf <- randomForest(first_owner ~ year + mileage + brand_group + automatic_transmission + 
+    drivetrain_group + price + bluetooth + third_row_seating, data = mydf)
+print(model_rf)
+
+# Feature importance plot for Random Forest
+varImpPlot(model_rf)
+#year, mileage, price imp features
+```
+$$
+\log\left(\frac{P(\text{first_owner} = 1)}{1 - P(\text{first_owner} = 1)}\right) = -159.1 + 0.077 \times \text{year} - 3.26 \times 10^{-5} \times \text{mileage} + 2.21 \times \text{brand_groupLow_Price} \\
++ 0.84 \times \text{brand_groupMid_Price} + 1.35 \times \text{automatic_transmission1} + 0.17 \times \text{drivetrain_groupFour-wheel Drive} \\
++ 0.77 \times \text{drivetrain_groupFront-wheel Drive} + 0.0000946 \times \text{price} - 1.10 \times \text{bluetooth1} + 1.46 \times \text{third_row_seating1}
+$$
+```{r}
+exp(coef(first_owner_model))
+```
+   - Certain variables (e.g., brand groups, automatic transmission, front-wheel drive, third-row seating)          exhibit values greater than 1, suggesting a substantial positive effect on the likelihood of the car          being sold by the first owner with each unit increase.
+
+  - Conversely, variables like mileage and Bluetooth show values near 1, indicating minimal impact on these       odds.
+ 
+ 
+           Justify and propose one model. Describe, Explaining and Critiquing it.
+           
+           
+           
+(i) Model 1: Null deviance = 568.14, Residual deviance = 415.33, AIC = 435.33
+             Generalized Linear Model: Accuracy = 0.790, Kappa = 0.580
+             Random Forest: OOB Error rate = 22.68%
+            
+(ii) Model 2: Null deviance = 568.14, Residual deviance = 422.53, AIC = 444.53
+              Generalized Linear Model: Accuracy = 0.780, Kappa = 0.560
+              Random Forest: OOB Error rate = 21.71%
+      
+
+1. Two models were compared: Model 1 with all original variables and Model 2 with grouped categorical levels of brand, fuel, and drivetrain.
+
+2. Model 1 had a lower AIC and residual deviance, indicating better statistical fit, but Model 2 was more interpretable due to reduced categorical levels.
+
+3. In cross-validation, Model 1 slightly outperformed Model 2 in accuracy and kappa values. However, Model 2 had a slightly lower error rate in the Random Forest algorithm, suggesting better predictive performance.
+
+4. Visual inspection of residuals showed that Model 2 had better homoscedasticity and independence of errors.
+Therefore, Model 2 was chosen as the ideal model despite Model 1’s lower AIC and residual deviance.
+
+5. Random Forest identified price, mileage, and year as key predictors of price.
+      
+6. Key Trends:
+    - Odds of first_owner selling increase with year and price, decrease with mileage.
+    - Low and mid-priced brands have higher chances of being sold by first owners.
+    - Automatic Transmission, Third Row Seating, and Front-wheel drives increase odds of first owner selling.
+
+
+# References  
+[@openai2022chatgpt]
+[@microsoft2023bingchat]
+   
