@@ -7,6 +7,7 @@
 👤 Users can sign up/login, create posts with book titles, ratings, cover images, and captions, view a home feed with infinite scrolling, see their profile with their posts, and delete posts. 
 
 🌐 Built with React Native/Expo Router (frontend) and Node.js/Express/MongoDB (backend), with image uploads via Cloudinary.
+
 ---
 
 ## 🧑‍🍳 App Features Overview
